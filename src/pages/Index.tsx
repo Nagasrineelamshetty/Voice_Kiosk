@@ -61,7 +61,7 @@ const Index = () => {
                 <Hospital className="w-8 h-8 text-white" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold text-foreground">CityCare Hospital</h1>
+                <h1 className="text-3xl font-bold text-foreground">Hospital Voice Kiosk</h1>
                 <p className="text-sm text-muted-foreground mt-1">Advanced Healthcare Services</p>
               </div>
             </div>
@@ -70,9 +70,9 @@ const Index = () => {
                 <SelectValue placeholder="Select Language" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="english">🇬🇧 English</SelectItem>
-                <SelectItem value="hindi">🇮🇳 हिंदी</SelectItem>
-                <SelectItem value="telugu">🇮🇳 తెలుగు</SelectItem>
+                <SelectItem value="english">en English</SelectItem>
+                <SelectItem value="hindi">hn हिंदी</SelectItem>
+                <SelectItem value="telugu">te తెలుగు</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -84,10 +84,11 @@ const Index = () => {
         {/* Welcome Banner */}
         <div className="text-center mb-12">
           <h2 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-            Welcome to CityCare Smart Helpdesk
+            Welcome to Smart Voice Helpdesk
           </h2>
           <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
-            Ask me anything — I can guide you to doctors, rooms, and departments!
+            We are here to help you.
+            Ask us anything — We can guide you to doctors, rooms, and departments!
           </p>
         </div>
 
@@ -208,7 +209,7 @@ const Index = () => {
       {/* Footer */}
       <footer className="mt-16 py-6 border-t bg-white/50">
         <div className="container mx-auto px-6 text-center text-sm text-muted-foreground">
-          <p>CityCare Hospital Smart Helpdesk © 2025 • Available 24/7</p>
+          <p>Hospital Smart Voice Helpdesk © 2025 • Available 24/7</p>
         </div>
       </footer>
     </div>
