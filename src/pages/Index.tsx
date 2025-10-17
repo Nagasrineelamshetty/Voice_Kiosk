@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -11,42 +11,95 @@ const Index = () => {
   const [aiResponse, setAiResponse] = useState("");
   const [language, setLanguage] = useState("english");
   const [isPlaying, setIsPlaying] = useState(false);
+  const [audioUrl, setAudioUrl] = useState("");
 
-  const handleMicClick = () => {
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+
+  // -----------------------------
+  // Start/Stop Recording
+  // -----------------------------
+  const handleMicClick = async () => {
     if (!isRecording) {
+      // Start recording
       setIsRecording(true);
       toast.success("Recording started...");
-      
-      // Simulate speech recognition
-      setTimeout(() => {
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mediaRecorder = new MediaRecorder(stream);
+        mediaRecorderRef.current = mediaRecorder;
+        audioChunksRef.current = [];
+
+        mediaRecorder.ondataavailable = (event) => {
+          audioChunksRef.current.push(event.data);
+        };
+
+        mediaRecorder.onstop = async () => {
+          const audioBlob = new Blob(audioChunksRef.current, { type: "audio/wav" });
+          await sendAudioToBackend(audioBlob);
+        };
+
+        mediaRecorder.start();
+      } catch (err) {
+        console.error(err);
+        toast.error("Microphone access denied or error occurred");
         setIsRecording(false);
-        setRecognizedText("Where is Dr. Sharma's cabin?");
-        
-        // Simulate AI response
-        setTimeout(() => {
-          setAiResponse("Dr. Sharma's cabin is in Room 203, First Floor. Take the elevator on your left, turn right after exiting, and it will be the third door on your right.");
-        }, 1000);
-      }, 3000);
+      }
     } else {
+      // Stop recording
       setIsRecording(false);
       toast.info("Recording stopped");
+      mediaRecorderRef.current?.stop();
     }
   };
 
-  const handlePlayAudio = () => {
-    setIsPlaying(true);
-    toast.success("Playing audio response...");
-    
-    setTimeout(() => {
-      setIsPlaying(false);
-    }, 3000);
+  // -----------------------------
+  // Send recorded audio to backend
+  // -----------------------------
+  const sendAudioToBackend = async (audioBlob: Blob) => {
+    try {
+      const formData = new FormData();
+      formData.append("file", audioBlob, "voice_query.wav");
+
+      const res = await fetch("http://localhost:8000/api/query", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) throw new Error("Failed to fetch AI response");
+
+      const data = await res.json();
+      setRecognizedText(data.query);
+      setAiResponse(data.answer);
+      setAudioUrl(`http://localhost:8000${data.audio_url}`);
+    } catch (err) {
+      console.error(err);
+      toast.error("Error fetching AI response");
+    }
   };
 
+  // -----------------------------
+  // Play AI response audio
+  // -----------------------------
+  const handlePlayAudio = () => {
+    if (audioUrl) {
+      setIsPlaying(true);
+      const audio = new Audio(audioUrl);
+      audio.play();
+      audio.onended = () => setIsPlaying(false);
+    }
+  };
+
+  // -----------------------------
+  // Clear everything
+  // -----------------------------
   const handleClear = () => {
     setRecognizedText("");
     setAiResponse("");
     setIsRecording(false);
     setIsPlaying(false);
+    setAudioUrl("");
     toast.success("Screen cleared");
   };
 
@@ -54,45 +107,40 @@ const Index = () => {
     <div className="min-h-screen bg-gradient-to-b from-background to-blue-50/30">
       {/* Header Section */}
       <header className="bg-white shadow-soft border-b">
-        <div className="container mx-auto px-6 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-primary-glow shadow-medical">
-                <Hospital className="w-8 h-8 text-white" />
-              </div>
-              <div>
-                <h1 className="text-3xl font-bold text-foreground">Hospital Voice Kiosk</h1>
-                <p className="text-sm text-muted-foreground mt-1">Advanced Healthcare Services</p>
-              </div>
+        <div className="container mx-auto px-6 py-6 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-primary-glow shadow-medical">
+              <Hospital className="w-8 h-8 text-white" />
             </div>
-            <Select value={language} onValueChange={setLanguage}>
-              <SelectTrigger className="w-[180px] border-2 rounded-xl">
-                <SelectValue placeholder="Select Language" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="english">en English</SelectItem>
-                <SelectItem value="hindi">hn हिंदी</SelectItem>
-                <SelectItem value="telugu">te తెలుగు</SelectItem>
-              </SelectContent>
-            </Select>
+            <div>
+              <h1 className="text-3xl font-bold text-foreground">Hospital Voice Kiosk</h1>
+              <p className="text-sm text-muted-foreground mt-1">Advanced Healthcare Services</p>
+            </div>
           </div>
+          <Select value={language} onValueChange={setLanguage}>
+            <SelectTrigger className="w-[180px] border-2 rounded-xl">
+              <SelectValue placeholder="Select Language" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="english">en English</SelectItem>
+              <SelectItem value="hindi">hn हिंदी</SelectItem>
+              <SelectItem value="telugu">te తెలుగు</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </header>
 
       {/* Main Content */}
       <main className="container mx-auto px-6 py-12">
-        {/* Welcome Banner */}
         <div className="text-center mb-12">
           <h2 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
             Welcome to Smart Voice Helpdesk
           </h2>
           <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
-            We are here to help you.
-            Ask us anything — We can guide you to doctors, rooms, and departments!
+            We are here to help you. Ask us anything — We can guide you to doctors, rooms, and departments!
           </p>
         </div>
 
-        {/* Main Interaction Card */}
         <Card className="max-w-4xl mx-auto p-8 md:p-12 shadow-medical border-2">
           {/* Microphone Button */}
           <div className="flex justify-center mb-12">
@@ -112,7 +160,7 @@ const Index = () => {
             </button>
           </div>
 
-          {/* Recognized Text Display */}
+          {/* Recognized Text */}
           {recognizedText && (
             <div className="mb-8 animate-fade-in">
               <label className="block text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wide">
@@ -124,7 +172,7 @@ const Index = () => {
             </div>
           )}
 
-          {/* AI Response Display */}
+          {/* AI Response */}
           {aiResponse && (
             <div className="mb-8 animate-fade-in">
               <label className="block text-sm font-semibold text-muted-foreground mb-3 uppercase tracking-wide">
@@ -134,14 +182,9 @@ const Index = () => {
                 <p className="text-lg md:text-xl text-foreground leading-relaxed">{aiResponse}</p>
               </Card>
 
-              {/* Audio Playback Button */}
+              {/* Play Audio */}
               <div className="flex justify-center mt-6">
-                <Button
-                  onClick={handlePlayAudio}
-                  disabled={isPlaying}
-                  size="lg"
-                  className="bg-gradient-to-r from-accent to-accent/90 hover:from-accent/90 hover:to-accent text-white shadow-soft rounded-xl px-8"
-                >
+                <Button onClick={handlePlayAudio} disabled={isPlaying} size="lg" className="bg-gradient-to-r from-accent to-accent/90 hover:from-accent/90 hover:to-accent text-white shadow-soft rounded-xl px-8">
                   <Volume2 className={`mr-2 h-5 w-5 ${isPlaying ? "animate-pulse" : ""}`} />
                   {isPlaying ? "Playing..." : "Play Audio Response"}
                 </Button>
@@ -149,69 +192,23 @@ const Index = () => {
             </div>
           )}
 
-          {/* Clear Button */}
+          {/* Clear */}
           {(recognizedText || aiResponse) && (
             <div className="flex justify-center mt-8">
-              <Button
-                onClick={handleClear}
-                variant="outline"
-                size="lg"
-                className="border-2 rounded-xl px-8 hover:bg-destructive/10 hover:text-destructive hover:border-destructive"
-              >
+              <Button onClick={handleClear} variant="outline" size="lg" className="border-2 rounded-xl px-8 hover:bg-destructive/10 hover:text-destructive hover:border-destructive">
                 <Trash2 className="mr-2 h-5 w-5" />
                 Clear Screen
               </Button>
             </div>
           )}
 
-          {/* Helper Text */}
           {!recognizedText && !isRecording && (
             <div className="text-center text-muted-foreground">
               <p className="text-lg">Click the microphone to start speaking</p>
             </div>
           )}
         </Card>
-
-        {/* Info Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto mt-12">
-          <Card className="p-6 text-center hover:shadow-medical transition-shadow border-2">
-            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
-              <Hospital className="w-6 h-6 text-primary" />
-            </div>
-            <h3 className="font-semibold text-lg mb-2">Find Doctors</h3>
-            <p className="text-sm text-muted-foreground">
-              Locate any doctor's cabin or consulting room
-            </p>
-          </Card>
-
-          <Card className="p-6 text-center hover:shadow-medical transition-shadow border-2">
-            <div className="w-12 h-12 rounded-full bg-accent/10 flex items-center justify-center mx-auto mb-4">
-              <Mic className="w-6 h-6 text-accent" />
-            </div>
-            <h3 className="font-semibold text-lg mb-2">Voice Enabled</h3>
-            <p className="text-sm text-muted-foreground">
-              Simply speak your query in your language
-            </p>
-          </Card>
-
-          <Card className="p-6 text-center hover:shadow-medical transition-shadow border-2">
-            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
-              <Volume2 className="w-6 h-6 text-primary" />
-            </div>
-            <h3 className="font-semibold text-lg mb-2">Audio Response</h3>
-            <p className="text-sm text-muted-foreground">
-              Listen to directions and guidance
-            </p>
-          </Card>
-        </div>
       </main>
-
-      {/* Footer */}
-      <footer className="mt-16 py-6 border-t bg-white/50">
-        <div className="container mx-auto px-6 text-center text-sm text-muted-foreground">
-          <p>Hospital Smart Voice Helpdesk © 2025 • Available 24/7</p>
-        </div>
-      </footer>
     </div>
   );
 };
